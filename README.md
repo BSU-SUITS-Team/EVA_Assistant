@@ -30,6 +30,10 @@ $ python3 app.py
 ```
 The Flask server will start at http://127.0.0.1:5000/
 
+## Needed Information/Discussion Topics
+* Understanding the way the chatbot can reference mission information to create the proper output
+* 
+
 ## Future Updates
 * Create backend functionality to store and use conversation history for more in-context responses.
 * Optimize model reponse behavior with different prompt designs and Ollama CLI parameters.
