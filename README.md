@@ -1,34 +1,65 @@
 # EVA Assistant
-Local chatbot powered by Deepseek AI model.
+Local chatbot powered by Ollama.
 
 ## Prerequisites
 * Python 3.8+
 * pip (Python package installer)
-* Ollama with Deepseek installed locally
+
+## Dependencies
+* Ollama
+  * Stored locally on machine to run chatbot
+* LangChain
+  * Open-source framework with pre-built agent architecture and integrations
+* Chroma
+  * Vector store database
+* Pandas
+  * Library to read in files
 
 ## Usage
 
 This project runs through a venv virtual environment in order to keep dependencies from interfering with other local projects.
 
-First, you will need to ensure you load into the virtual environment before installing packages.
+### Python Setup/Installation
+In the command terminal, you will need to load into the virtual environment first, before installing packages. To do this:
 
-For Linux:
-```
-$ source EVA_Assistant/bin/activate
-$ pip install flask
-```
-
-For Windows:
-```
-$ EVA_Assistant\Scripts\activate
-$ pip install flask
+Linux/MAC:
+```console
+$ ./venv/bin/activate
+$ pip install -r ./requirements.txt
 ```
 
-The chat interface currently runs on a local Flask server. To start the server, run in the terminal:
+Windows:
+```console
+$ ./venv/Scripts/activate
+$ pip install -r ./requirements.txt
 ```
-$ python3 app.py
+After running this, the required dependencies will be installed into the virtual environment to use.
+
+### Ollama Setup
+Next, to be able to locally run a model, you will need to download [Ollama](https://ollama.com/) from their website. 
+This EVA assitant uses the llama3.2 model, as well as an embedding model mxbai-embed-large. We will download these from the console using the ollama command.
+
+```console
+$ ollama pull llama3.2
+pulling manifest
+...
+success
+$ ollama pull mxbai-embed-large
+pulling manifest
+...
+success
 ```
-The Flask server will start at http://127.0.0.1:5000/
+### Starting Chat (currently in terminal)
+To run the chat in the terminal:
+
+Linx/MAC:
+```console
+$ python3 main.py
+```
+Windows:
+```console
+$ python main.py
+```
 
 ## Needed Information/Discussion Topics
 * Understanding the way the chatbot can reference mission information to create the proper output
