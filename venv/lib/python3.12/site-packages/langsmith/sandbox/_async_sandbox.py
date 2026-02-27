@@ -11,6 +11,7 @@ from langsmith.sandbox._exceptions import (
     DataplaneNotConfiguredError,
     ResourceNotFoundError,
     SandboxConnectionError,
+    SandboxNotReadyError,
 )
 from langsmith.sandbox._helpers import handle_sandbox_http_error
 from langsmith.sandbox._models import (
@@ -33,8 +34,11 @@ class AsyncSandbox:
         name: Display name (can be updated).
         template_name: Name of the template used to create this sandbox.
         dataplane_url: URL for data plane operations (file I/O, command execution).
+            Only functional when status is "ready".
         id: Unique identifier (UUID). Remains constant even if name changes.
             May be None for resources created before ID support was added.
+        status: Sandbox lifecycle status. One of "provisioning", "ready", "failed".
+        status_message: Human-readable details when status is "failed", None otherwise.
         created_at: Timestamp when the sandbox was created.
         updated_at: Timestamp when the sandbox was last updated.
 
@@ -49,6 +53,8 @@ class AsyncSandbox:
     template_name: str
     dataplane_url: Optional[str] = None
     id: Optional[str] = None
+    status: str = "ready"
+    status_message: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -78,6 +84,8 @@ class AsyncSandbox:
             template_name=data.get("template_name", ""),
             dataplane_url=data.get("dataplane_url"),
             id=data.get("id"),
+            status=data.get("status", "ready"),
+            status_message=data.get("status_message"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
             _client=client,
@@ -109,8 +117,14 @@ class AsyncSandbox:
             The dataplane URL.
 
         Raises:
+            SandboxNotReadyError: If sandbox status is not "ready".
             DataplaneNotConfiguredError: If dataplane_url is not configured.
         """
+        if self.status != "ready":
+            raise SandboxNotReadyError(
+                f"Sandbox '{self.name}' is not ready (status: {self.status}). "
+                "Wait for status 'ready' before running operations."
+            )
         if not self.dataplane_url:
             raise DataplaneNotConfiguredError(
                 f"Sandbox '{self.name}' does not have a dataplane_url configured. "
@@ -187,7 +201,7 @@ class AsyncSandbox:
             DataplaneNotConfiguredError: If dataplane_url is not configured.
             SandboxOperationError: If command execution fails.
             CommandTimeoutError: If command exceeds its timeout.
-            SandboxConnectionError: If connection to sandbox fails.
+            SandboxConnectionError: If connection to sandbox fails after retries.
             SandboxNotReadyError: If sandbox is not ready.
             SandboxClientError: For other errors.
         """
@@ -305,13 +319,8 @@ class AsyncSandbox:
                 stderr=data.get("stderr", ""),
                 exit_code=data.get("exit_code", -1),
             )
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(
-                f"Failed to connect to sandbox '{self.name}': {e}"
-            ) from e
         except httpx.HTTPStatusError as e:
             handle_sandbox_http_error(e)
-            # This line should never be reached but satisfies type checker
             raise  # pragma: no cover
 
     async def reconnect(
@@ -336,7 +345,7 @@ class AsyncSandbox:
 
         Raises:
             SandboxOperationError: If command_id is not found or session expired.
-            SandboxConnectionError: If connection to sandbox fails.
+            SandboxConnectionError: If connection to sandbox fails after retries.
         """
         from langsmith.sandbox._ws_execute import reconnect_ws_stream_async
 
@@ -377,7 +386,7 @@ class AsyncSandbox:
         Raises:
             DataplaneNotConfiguredError: If dataplane_url is not configured.
             SandboxOperationError: If file write fails.
-            SandboxConnectionError: If connection to sandbox fails.
+            SandboxConnectionError: If connection to sandbox fails after retries.
             SandboxNotReadyError: If sandbox is not ready.
             SandboxClientError: For other errors.
         """
@@ -395,10 +404,6 @@ class AsyncSandbox:
                 url, params={"path": path}, files=files, timeout=timeout
             )
             response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(
-                f"Failed to connect to sandbox '{self.name}': {e}"
-            ) from e
         except httpx.HTTPStatusError as e:
             handle_sandbox_http_error(e)
 
@@ -417,7 +422,7 @@ class AsyncSandbox:
             DataplaneNotConfiguredError: If dataplane_url is not configured.
             ResourceNotFoundError: If the file doesn't exist.
             SandboxOperationError: If file read fails.
-            SandboxConnectionError: If connection to sandbox fails.
+            SandboxConnectionError: If connection to sandbox fails after retries.
             SandboxNotReadyError: If sandbox is not ready.
             SandboxClientError: For other errors.
         """
@@ -430,10 +435,6 @@ class AsyncSandbox:
             )
             response.raise_for_status()
             return response.content
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(
-                f"Failed to connect to sandbox '{self.name}': {e}"
-            ) from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(

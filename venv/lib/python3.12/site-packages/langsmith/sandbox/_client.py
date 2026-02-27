@@ -8,11 +8,12 @@ import httpx
 
 from langsmith import utils as ls_utils
 from langsmith.sandbox._exceptions import (
+    ResourceCreationError,
     ResourceInUseError,
     ResourceNameConflictError,
     ResourceNotFoundError,
+    ResourceTimeoutError,
     SandboxAPIError,
-    SandboxConnectionError,
     ValidationError,
 )
 from langsmith.sandbox._helpers import (
@@ -22,8 +23,15 @@ from langsmith.sandbox._helpers import (
     handle_volume_creation_error,
     parse_error_response,
 )
-from langsmith.sandbox._models import Pool, SandboxTemplate, Volume, VolumeMountSpec
+from langsmith.sandbox._models import (
+    Pool,
+    ResourceStatus,
+    SandboxTemplate,
+    Volume,
+    VolumeMountSpec,
+)
 from langsmith.sandbox._sandbox import Sandbox
+from langsmith.sandbox._transport import RetryTransport
 
 
 def _get_default_api_endpoint() -> str:
@@ -67,6 +75,7 @@ class SandboxClient:
         api_endpoint: Optional[str] = None,
         timeout: float = 10.0,
         api_key: Optional[str] = None,
+        max_retries: int = 3,
     ):
         """Initialize the SandboxClient.
 
@@ -76,6 +85,9 @@ class SandboxClient:
             timeout: Default HTTP timeout in seconds.
             api_key: API key for authentication. If not provided, uses
                      LANGSMITH_API_KEY environment variable.
+            max_retries: Maximum number of retries for transient errors (502, 503,
+                         504), rate limits (429), and connection failures. Set to 0
+                         to disable retries. Default: 3.
         """
         self._base_url = (api_endpoint or _get_default_api_endpoint()).rstrip("/")
         resolved_api_key = api_key or _get_default_api_key()
@@ -83,7 +95,8 @@ class SandboxClient:
         headers: dict[str, str] = {}
         if resolved_api_key:
             headers["X-Api-Key"] = resolved_api_key
-        self._http = httpx.Client(timeout=timeout, headers=headers)
+        transport = RetryTransport(max_retries=max_retries)
+        self._http = httpx.Client(transport=transport, timeout=timeout, headers=headers)
 
     def close(self) -> None:
         """Close the HTTP client."""
@@ -148,12 +161,9 @@ class SandboxClient:
         }
 
         try:
-            # Use longer timeout for volume creation (includes wait_for_ready)
             response = self._http.post(url, json=payload, timeout=timeout + 30)
             response.raise_for_status()
             return Volume.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             handle_volume_creation_error(e)
             raise  # pragma: no cover
@@ -177,8 +187,6 @@ class SandboxClient:
             response = self._http.get(url)
             response.raise_for_status()
             return Volume.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -200,8 +208,6 @@ class SandboxClient:
             response.raise_for_status()
             data = response.json()
             return [Volume.from_dict(v) for v in data.get("volumes", [])]
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise SandboxAPIError(
@@ -227,8 +233,6 @@ class SandboxClient:
         try:
             response = self._http.delete(url)
             response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -281,8 +285,6 @@ class SandboxClient:
             response = self._http.patch(url, json=payload)
             response.raise_for_status()
             return Volume.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -354,8 +356,6 @@ class SandboxClient:
             response = self._http.post(url, json=payload)
             response.raise_for_status()
             return SandboxTemplate.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             handle_client_http_error(e)
             raise  # pragma: no cover
@@ -379,8 +379,6 @@ class SandboxClient:
             response = self._http.get(url)
             response.raise_for_status()
             return SandboxTemplate.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -402,8 +400,6 @@ class SandboxClient:
             response.raise_for_status()
             data = response.json()
             return [SandboxTemplate.from_dict(t) for t in data.get("templates", [])]
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise SandboxAPIError(
@@ -435,8 +431,6 @@ class SandboxClient:
             response = self._http.patch(url, json=payload)
             response.raise_for_status()
             return SandboxTemplate.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -466,8 +460,6 @@ class SandboxClient:
         try:
             response = self._http.delete(url)
             response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -524,13 +516,10 @@ class SandboxClient:
         }
 
         try:
-            # Use longer HTTP timeout when waiting for ready
             http_timeout = timeout + 30
             response = self._http.post(url, json=payload, timeout=http_timeout)
             response.raise_for_status()
             return Pool.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             handle_pool_error(e)
             raise  # pragma: no cover
@@ -554,8 +543,6 @@ class SandboxClient:
             response = self._http.get(url)
             response.raise_for_status()
             return Pool.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -577,8 +564,6 @@ class SandboxClient:
             response.raise_for_status()
             data = response.json()
             return [Pool.from_dict(p) for p in data.get("pools", [])]
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise SandboxAPIError(
@@ -631,8 +616,6 @@ class SandboxClient:
             response = self._http.patch(url, json=payload)
             response.raise_for_status()
             return Pool.from_dict(response.json())
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -663,8 +646,6 @@ class SandboxClient:
         try:
             response = self._http.delete(url)
             response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -704,7 +685,7 @@ class SandboxClient:
 
         Raises:
             ResourceTimeoutError: If timeout waiting for sandbox to be ready.
-            SandboxCreationError: If sandbox creation fails.
+            ResourceCreationError: If sandbox creation fails.
             SandboxClientError: For other errors.
         """
         sb = self.create_sandbox(
@@ -721,6 +702,7 @@ class SandboxClient:
         *,
         name: Optional[str] = None,
         timeout: int = 30,
+        wait_for_ready: bool = True,
     ) -> Sandbox:
         """Create a new Sandbox.
 
@@ -730,33 +712,38 @@ class SandboxClient:
         Args:
             template_name: Name of the SandboxTemplate to use.
             name: Optional sandbox name (auto-generated if not provided).
-            timeout: Timeout in seconds when waiting for ready.
+            timeout: Timeout in seconds when waiting for ready (only used when
+                wait_for_ready=True).
+            wait_for_ready: If True (default), block until sandbox is ready.
+                If False, return immediately with status "provisioning". Use
+                get_sandbox_status() or wait_for_sandbox() to poll for readiness.
 
         Returns:
-            Created Sandbox.
+            Created Sandbox. When wait_for_ready=False, the sandbox will have
+            status="provisioning" and cannot be used for operations until ready.
 
         Raises:
             ResourceTimeoutError: If timeout waiting for sandbox to be ready.
-            SandboxCreationError: If sandbox creation fails.
+            ResourceCreationError: If sandbox creation fails.
             SandboxClientError: For other errors.
         """
         url = f"{self._base_url}/boxes"
 
         payload: dict[str, Any] = {
             "template_name": template_name,
-            "wait_for_ready": True,
-            "timeout": timeout,
+            "wait_for_ready": wait_for_ready,
         }
+        if wait_for_ready:
+            payload["timeout"] = timeout
         if name:
             payload["name"] = name
 
+        http_timeout = (timeout + 30) if wait_for_ready else 30
+
         try:
-            # Use longer timeout for sandbox creation (includes wait_for_ready)
-            response = self._http.post(url, json=payload, timeout=timeout + 30)
+            response = self._http.post(url, json=payload, timeout=http_timeout)
             response.raise_for_status()
             return Sandbox.from_dict(response.json(), client=self, auto_delete=False)
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             handle_sandbox_creation_error(e)
             raise  # pragma: no cover
@@ -782,8 +769,6 @@ class SandboxClient:
             response = self._http.get(url)
             response.raise_for_status()
             return Sandbox.from_dict(response.json(), client=self, auto_delete=False)
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -808,8 +793,6 @@ class SandboxClient:
                 Sandbox.from_dict(c, client=self, auto_delete=False)
                 for c in data.get("sandboxes", [])
             ]
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise SandboxAPIError(
@@ -841,8 +824,6 @@ class SandboxClient:
             response = self._http.patch(url, json=payload)
             response.raise_for_status()
             return Sandbox.from_dict(response.json(), client=self, auto_delete=False)
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
@@ -871,11 +852,87 @@ class SandboxClient:
         try:
             response = self._http.delete(url)
             response.raise_for_status()
-        except httpx.ConnectError as e:
-            raise SandboxConnectionError(f"Failed to connect to server: {e}") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 raise ResourceNotFoundError(
                     f"Sandbox '{name}' not found", resource_type="sandbox"
                 ) from e
             handle_client_http_error(e)
+
+    def get_sandbox_status(self, name: str) -> ResourceStatus:
+        """Get the provisioning status of a sandbox.
+
+        This is a lightweight endpoint designed for high-frequency polling
+        during sandbox provisioning. It returns only the status fields
+        without full sandbox data.
+
+        Args:
+            name: Sandbox name.
+
+        Returns:
+            ResourceStatus with status and status_message.
+
+        Raises:
+            ResourceNotFoundError: If sandbox not found.
+            SandboxClientError: For other errors.
+        """
+        url = f"{self._base_url}/boxes/{name}/status"
+
+        try:
+            response = self._http.get(url)
+            response.raise_for_status()
+            return ResourceStatus.from_dict(response.json())
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise ResourceNotFoundError(
+                    f"Sandbox '{name}' not found", resource_type="sandbox"
+                ) from e
+            handle_client_http_error(e)
+            raise  # pragma: no cover
+
+    def wait_for_sandbox(
+        self,
+        name: str,
+        *,
+        timeout: int = 120,
+        poll_interval: float = 1.0,
+    ) -> Sandbox:
+        """Poll until a sandbox reaches "ready" or "failed" status.
+
+        Uses the lightweight status endpoint for polling, then fetches the
+        full sandbox data once ready.
+
+        Args:
+            name: Sandbox name.
+            timeout: Maximum time to wait in seconds.
+            poll_interval: Time between status checks in seconds.
+
+        Returns:
+            Sandbox in "ready" status.
+
+        Raises:
+            ResourceCreationError: If sandbox status becomes "failed".
+            ResourceTimeoutError: If timeout expires while still "provisioning".
+            ResourceNotFoundError: If sandbox not found.
+            SandboxClientError: For other errors.
+        """
+        import time
+
+        deadline = time.monotonic() + timeout
+        while True:
+            status = self.get_sandbox_status(name)
+            if status.status == "ready":
+                return self.get_sandbox(name)
+            if status.status == "failed":
+                raise ResourceCreationError(
+                    status.status_message or "Sandbox provisioning failed",
+                    resource_type="sandbox",
+                )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ResourceTimeoutError(
+                    f"Sandbox '{name}' not ready after {timeout}s",
+                    resource_type="sandbox",
+                    last_status=status.status,
+                )
+            time.sleep(min(poll_interval, remaining))

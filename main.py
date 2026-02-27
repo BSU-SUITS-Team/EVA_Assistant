@@ -3,7 +3,12 @@ from langchain_core.prompts import ChatPromptTemplate
 
 model = OllamaLLM(model="llama3.2")
 
-# Tempate to feed into the model to allow it to create a curated response
+'''
+Tempate to feed into the model to allow it to create a curated response
+
+Currently prompting the model that it is supporting an astronaut during a lunar mission,
+then feeding it the mission data and the question from the user.
+'''
 template = """
 You are supporting an astronaut during a lunar mission.
 
