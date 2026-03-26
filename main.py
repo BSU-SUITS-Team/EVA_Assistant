@@ -4,6 +4,7 @@ from vector import retriever
 
 
 model = OllamaLLM(model="llama3.2")
+MAX_HISTORY_TURNS = 6
 
 '''
 Tempate to feed into the model to allow it to create a curated response
@@ -14,6 +15,9 @@ then feeding it the mission data and the question from the user.
 template = """
 You are supporting an astronaut during a lunar mission. Responses are concise and only include
 information relevant to the question asked.
+
+Recent conversation context:
+{chat_history}
 
 Here are the current telemetry readings: {telemetry}
 
@@ -37,6 +41,19 @@ def format_retrieved_context(documents):
 
     return "\n\n".join(chunks)
 
+
+def format_chat_history(chat_history):
+    if not chat_history:
+        return "No prior conversation."
+
+    return "\n".join(
+        f"User: {turn['question']}\nAssistant: {turn['answer']}"
+        for turn in chat_history
+    )
+
+
+chat_history = []
+
 # Allows user to ask questions until they prompt they are done
 while True:
     print("\n\n-------------------------")
@@ -47,5 +64,17 @@ while True:
 
     telemetry_docs = retriever.invoke(question)
     telemetry_context = format_retrieved_context(telemetry_docs)
-    result = chain.invoke({"telemetry": telemetry_context, "question": question})
+    history_context = format_chat_history(chat_history)
+    result = chain.invoke(
+        {
+            "chat_history": history_context,
+            "telemetry": telemetry_context,
+            "question": question,
+        }
+    )
+
+    chat_history.append({"question": question, "answer": result})
+    if len(chat_history) > MAX_HISTORY_TURNS:
+        chat_history = chat_history[-MAX_HISTORY_TURNS:]
+
     print(result)
