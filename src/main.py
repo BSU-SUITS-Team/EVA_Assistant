@@ -7,7 +7,7 @@ model = OllamaLLM(model="llama3.2")
 MAX_HISTORY_TURNS = 6
 
 '''
-Tempate to feed into the model to allow it to create a curated response
+Template to feed into the model to allow it to create a curated response
 
 Currently prompting the model that it is supporting an astronaut during a lunar mission,
 then feeding it the mission data and the question from the user.
