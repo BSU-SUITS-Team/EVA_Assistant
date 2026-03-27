@@ -1,5 +1,5 @@
 # EVA Assistant
-Local chatbot powered by Ollama.
+Local chatbot powered by Ollama. IMplements a **Retrieval-Augmented Generation (RAG)** pipeline for mission-critical telemetry quireies.
 
 ## Prerequisites
 * Python 3.8+
@@ -54,12 +54,50 @@ To run the chat in the terminal:
 
 Linx/MAC:
 ```console
+$ cd ./src
 $ python3 main.py
 ```
 Windows:
 ```console
+$ cd src
 $ python main.py
 ```
+
+## Core Components
+1. **LLM Layer (main.py)**
+* Uses Ollama with llama3.2 model
+* Structured using LangChain's ChatPromptTemplate
+* Role-based prompt that frames responses w/ astronaut support context
+
+2. **Vector Database Layer (vector.py)**
+* **Embedding Model:** mxbai-embed-large (Ollama embeddings)
+* **Vector Store:** Chroma w/ persistent storage at chroma-langchain_db
+* **Retriever:** k=5 semantic search (returns 5 most relevant documents)
+
+3. **Data Processing Pipeline**
+* **Input:** JSON telemetry files from ./data directory
+* **Transformation:** Flattens nested JSON structures into individual field-value pairs
+* **Indexing:** Each flattened field becomes a document with metadata (source file, field name)
+* **Storage:** Only new documents are added (deduplication by document ID)
+
+## Execution Flow
+User Question
+
+ ↓
+
+[Retriever] → Semantic search in vector DB → Top 5 relevant telemetry fields
+
+↓
+
+[Formatter] → Format retrieved context + chat history
+
+↓
+
+[LLM Chain] → Generate concise response with context
+
+↓
+
+[Memory] → Store Q&A pair (max 6 turns kept)
 
 ## Needed Information/Discussion Topics
 * Understanding the way the chatbot can reference mission information to create the proper output

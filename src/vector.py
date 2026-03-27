@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-DB_LOCATION = "./chroma-langchain_db"
+DATA_DIR = Path(__file__).resolve().parent / "../data"
+DB_LOCATION = ".././chroma-langchain_db"
 
 
 def _flatten_json(obj, parent_key=""):
