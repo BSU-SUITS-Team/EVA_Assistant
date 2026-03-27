@@ -1,5 +1,5 @@
 # EVA Assistant
-Local chatbot powered by Ollama. IMplements a **Retrieval-Augmented Generation (RAG)** pipeline for mission-critical telemetry quireies.
+Local chatbot powered by Ollama. Implements a **Retrieval-Augmented Generation (RAG)** pipeline for mission-critical telemetry quireies.
 
 ## Prerequisites
 * Python 3.8+
@@ -101,7 +101,6 @@ User Question
 
 ## Needed Information/Discussion Topics
 * Understanding the way the chatbot can reference mission information to create the proper output
-* 
 
 ## Future Updates
 * Create backend functionality to store and use conversation history for more in-context responses.
