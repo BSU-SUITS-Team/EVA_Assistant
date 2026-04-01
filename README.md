@@ -71,38 +71,53 @@ $ python main.py
 
 2. **Vector Database Layer (vector.py)**
 * **Embedding Model:** mxbai-embed-large (Ollama embeddings)
-* **Vector Store:** Chroma w/ persistent storage at chroma-langchain_db
-* **Retriever:** k=5 semantic search (returns 5 most relevant documents)
+* **Vector Store:** Chroma w/ persistent storage at chroma-langchain_db (absolute path)
+* **Retriever:** Dynamic k=5-10 semantic search (adapts to available documents)
+* **Document Strategy:** Subsystem-based grouping for related field coherence
 
 3. **Data Processing Pipeline**
 * **Input:** JSON telemetry files from ./data directory
-* **Transformation:** Flattens nested JSON structures into individual field-value pairs
-* **Indexing:** Each flattened field becomes a document with metadata (source file, field name)
+* **Transformation:** Groups related telemetry fields by subsystem (oxygen_system, power_system, co2_removal, cooling_system, biometrics, mission_time)
+* **Indexing:** Creates two types of documents per EVA session:
+  - **Full telemetry:** Complete dataset for "give me all data" queries
+  - **Subsystem documents:** Grouped fields for system-specific queries and calculations
 * **Storage:** Only new documents are added (deduplication by document ID)
+* **Logging:** Tracks document loading, retrieval, and database health
 
 ## Execution Flow
 User Question
 
- ↓
+↓
 
-[Retriever] → Semantic search in vector DB → Top 5 relevant telemetry fields
+[Retriever] → Semantic search in vector DB → Most relevant subsystem/full telemetry documents
 
 ↓
 
-[Formatter] → Format retrieved context + chat history
+[Formatter] → Organize retrieved documents, prioritize full telemetry for complete datasets
 
 ↓
 
-[LLM Chain] → Generate concise response with context
+[LLM Chain] → Generate response with complete subsystem context (enables calculations)
 
 ↓
 
-[Memory] → Store Q&A pair (max 6 turns kept)
+[Memory] → Store Q&A pair (max 6 turns kept in history)
 
-## Needed Information/Discussion Topics
-* Understanding the way the chatbot can reference mission information to create the proper output
+## Key Improvements
+* **Better Calculations:** Subsystem grouping ensures all related data (e.g., oxygen storage + consumption rate) is retrieved together for accurate computations
+* **Full Telemetry Support:** Complete EVA datasets available in a single document for comprehensive queries
+* **Robust Paths:** Absolute path resolution prevents database lookup failures due to working directory changes
+* **Enhanced Debugging:** Logging throughout pipeline tracks retrieval and document processing for troubleshooting
+* **Dynamic Retrieval:** k parameter adapts to available documents, preventing under-retrieval
+
+## Troubleshooting
+* **Stale Data:** Delete `chroma-langchain_db/` folder and re-run `main.py` to rebuild the vector database with new subsystem structure
+* **Missing Telemetry:** Check console logs for data loading errors; ensure `data/*.json` files are valid JSON
+* **No Results:** Verify Ollama server is running and models (llama3.2, mxbai-embed-large) are installed
 
 ## Future Updates
-* Create backend functionality to store and use conversation history for more in-context responses.
-* Optimize model reponse behavior with different prompt designs and Ollama CLI parameters.
-* Create a more solidified environment for the chatbot.
+* Persistent conversation history backend for multi-session context
+* Prompt optimization with different designs and Ollama CLI parameters
+* Web UI frontend for easier interaction
+* Support for additional telemetry formats and real-time data streams
+* Temperature and other LLM parameter tuning for calculation accuracy
