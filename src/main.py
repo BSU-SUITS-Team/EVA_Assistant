@@ -6,74 +6,50 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-model = OllamaLLM(model="mistral")
+model = OllamaLLM(model="mistral", temperature=0.0)
 MAX_HISTORY_TURNS = 6
 
 '''
-Template to feed into the model to allow it to create a curated response.
-
-Currently prompting the model that it is supporting an astronaut during a lunar mission,
-then feeding it the mission data and the question from the user.
-
-The template emphasizes:
-- Using provided data for calculations
-- Structured formatting of responses
-- Clear reasoning for complex questions
+Simplified template for arithmetic-only calculations on telemetry data.
+Optimized for accuracy with temperature=0.0 for deterministic results.
 '''
 template = """
-You are an astronaut support system. You have access to telemetry data.
+You are an astronaut support system calculating telemetry values.
+
+**TASK:** Perform ONLY basic arithmetic using the provided telemetry data.
 
 **RULES:**
-- Return ONLY values from the telemetry data below
-- Do NOT make up or estimate values  
-- If a value is not provided, say exactly: "not provided"
-- For calculations, show all work using only provided numbers
+1. Extract ONLY numeric values that are explicitly provided
+2. Show each calculation step clearly
+3. If data is missing, return: "not provided"
+4. Do NOT estimate, interpret, or use external knowledge
+5. Return ONLY the final number or result
 
 Telemetry data:
 {telemetry}
 
-Previous conversation:
-{chat_history}
+Calculation needed: {question}
 
-Question: {question}
-
-Response (use only data shown above):
+Calculation:
 """
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
 
 
-def format_retrieved_context(documents):
+def format_retrieved_context(documents, limit_to_top_n=3):
     """
-    Format retrieved documents for better LLM comprehension.
-    Groups documents by type to maintain data relationships.
+    Format retrieved documents minimally for arithmetic calculations.
+    Only passes the top N most relevant documents to reduce noise.
     """
     if not documents:
         return "No telemetry context found in vector database."
 
-    # Group documents by type for better structure
-    full_telemetry = []
-    subsystems = {}
+    # Only use top N documents to reduce context noise
+    documents = documents[:limit_to_top_n]
     
-    for doc in documents:
-        doc_type = doc.metadata.get("type", "unknown")
-        
-        if doc_type == "full_telemetry":
-            full_telemetry.append(doc.page_content)
-        elif doc_type == "subsystem":
-            subsystem = doc.metadata.get("subsystem", "unknown")
-            if subsystem not in subsystems:
-                subsystems[subsystem] = []
-            subsystems[subsystem].append(doc.page_content)
-    
-    # Build formatted output: prioritize full telemetry, then subsystems
     formatted = []
-    
-    if full_telemetry:
-        formatted.extend(full_telemetry)
-    
-    for subsystem, contents in subsystems.items():
-        formatted.extend(contents)
+    for doc in documents:
+        formatted.append(doc.page_content)
     
     if not formatted:
         return "Retrieved data but could not format it."
@@ -82,13 +58,38 @@ def format_retrieved_context(documents):
     return result
 
 
+def normalize_question(question):
+    """
+    Normalize question to match telemetry field names.
+    Expands queries with common synonyms before semantic search.
+    """
+    synonyms = {
+        "oxygen": ["oxy", "o2", "o₂"],
+        "battery": ["power", "charge"],
+        "temperature": ["temp", "thermal"],
+        "pressure": ["psi", "bar"],
+        "tank": ["storage", "container"],
+        "consumption": ["usage", "depletion", "burn"],
+        "time remaining": ["duration", "eta", "how long"],
+    }
+    
+    expanded = question.lower()
+    for field, aliases in synonyms.items():
+        for alias in aliases:
+            if alias in expanded:
+                expanded += f" {field}"
+    return expanded
+
+
 def format_chat_history(chat_history):
     if not chat_history:
         return "No prior conversation."
 
+    # Only show last 2 turns for calculation context
+    recent_turns = chat_history[-2:]
     return "\n".join(
         f"User: {turn['question']}\nAssistant: {turn['answer']}"
-        for turn in chat_history
+        for turn in recent_turns
     )
 
 
@@ -107,13 +108,13 @@ while True:
         print("Please enter a question.")
         continue
 
-    telemetry_docs = retriever.invoke(question)
-    telemetry_context = format_retrieved_context(telemetry_docs)
-    history_context = format_chat_history(chat_history)
+    # Normalize question to improve retrieval accuracy
+    normalized_question = normalize_question(question)
+    telemetry_docs = retriever.invoke(normalized_question)
+    telemetry_context = format_retrieved_context(telemetry_docs, limit_to_top_n=3)
     
     result = chain.invoke(
         {
-            "chat_history": history_context,
             "telemetry": telemetry_context,
             "question": question,
         }
