@@ -1,104 +1,67 @@
+"""
+EVA Assistant - Simplified version
+Direct telemetry fetch + LLM arithmetic (no vector database)
+Fetches telemetry every second in background
+"""
+
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
-from vector import retriever
+from telemetry import start_polling, get_current_telemetry, format_telemetry_for_llm
 import logging
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = OllamaLLM(model="llama3.2")
+# Initialize LLM
+model = OllamaLLM(model="mistral", temperature=0.0)
 MAX_HISTORY_TURNS = 6
 
-'''
-Template to feed into the model to allow it to create a curated response.
-
-Currently prompting the model that it is supporting an astronaut during a lunar mission,
-then feeding it the mission data and the question from the user.
-
-The template emphasizes:
-- Using provided data for calculations
-- Structured formatting of responses
-- Clear reasoning for complex questions
-'''
+# Prompt template for arithmetic-only calculations
 template = """
-You are an astronaut support system. You have access to telemetry data.
+You are an astronaut support system calculating telemetry values.
+
+**TASK:** Perform ONLY basic arithmetic using the provided telemetry data.
 
 **RULES:**
-- Return ONLY values from the telemetry data below
-- Do NOT make up or estimate values  
-- If a value is not provided, say exactly: "not provided"
-- For calculations, show all work using only provided numbers
+1. Extract ONLY numeric values that are explicitly provided
+2. Show each calculation step clearly
+3. If data is missing, return: "not provided"
+4. Do NOT estimate, interpret, or use external knowledge
+5. Return ONLY the final number or result
 
 Telemetry data:
 {telemetry}
 
-Previous conversation:
-{chat_history}
-
 Question: {question}
 
-Response (use only data shown above):
+Answer:
 """
+
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
 
-
-def format_retrieved_context(documents):
-    """
-    Format retrieved documents for better LLM comprehension.
-    Groups documents by type to maintain data relationships.
-    """
-    if not documents:
-        return "No telemetry context found in vector database."
-
-    # Group documents by type for better structure
-    full_telemetry = []
-    subsystems = {}
-    
-    for doc in documents:
-        doc_type = doc.metadata.get("type", "unknown")
-        
-        if doc_type == "full_telemetry":
-            full_telemetry.append(doc.page_content)
-        elif doc_type == "subsystem":
-            subsystem = doc.metadata.get("subsystem", "unknown")
-            if subsystem not in subsystems:
-                subsystems[subsystem] = []
-            subsystems[subsystem].append(doc.page_content)
-    
-    # Build formatted output: prioritize full telemetry, then subsystems
-    formatted = []
-    
-    if full_telemetry:
-        formatted.extend(full_telemetry)
-    
-    for subsystem, contents in subsystems.items():
-        formatted.extend(contents)
-    
-    if not formatted:
-        return "Retrieved data but could not format it."
-    
-    result = "\n".join(formatted)
-    return result
-
-
-def format_chat_history(chat_history):
-    if not chat_history:
-        return "No prior conversation."
-
-    return "\n".join(
-        f"User: {turn['question']}\nAssistant: {turn['answer']}"
-        for turn in chat_history
-    )
-
-
+# Chat history
 chat_history = []
 
-# Allows user to ask questions until they type 'q' to quit
+# Main loop
+print("\n" + "="*60)
+print("EVA Assistant (Live Telemetry Mode)")
+print("="*60)
+
+# Start background polling
+print("\nInitializing telemetry polling...")
+if not start_polling():
+    print("ERROR: Could not start telemetry polling. Exiting.")
+    exit(1)
+
+print("✓ Telemetry polling active (updates every 1 second)\n")
+
+# Question loop
 while True:
-    print("\n" + "="*50)
+    print("="*60)
     question = input("Ask your question (q to quit): ").strip()
     print()
+    
     if question.lower() == "q":
         print("Exiting assistant. Goodbye!")
         break
@@ -106,21 +69,31 @@ while True:
     if not question:
         print("Please enter a question.")
         continue
-
-    telemetry_docs = retriever.invoke(question)
-    telemetry_context = format_retrieved_context(telemetry_docs)
-    history_context = format_chat_history(chat_history)
     
-    result = chain.invoke(
-        {
-            "chat_history": history_context,
-            "telemetry": telemetry_context,
-            "question": question,
-        }
-    )
-
-    chat_history.append({"question": question, "answer": result})
-    if len(chat_history) > MAX_HISTORY_TURNS:
-        chat_history = chat_history[-MAX_HISTORY_TURNS:]
-
-    print(f"\nAssistant: {result}")
+    try:
+        # Get latest telemetry data
+        telemetry_data = get_current_telemetry()
+        if not telemetry_data:
+            print("ERROR: No telemetry data available\n")
+            continue
+        
+        telemetry_text = format_telemetry_for_llm(telemetry_data)
+        
+        # Pass telemetry directly to LLM
+        logger.info(f"Processing question: {question}")
+        result = chain.invoke(
+            {
+                "telemetry": telemetry_text,
+                "question": question,
+            }
+        )
+        
+        chat_history.append({"question": question, "answer": result})
+        if len(chat_history) > MAX_HISTORY_TURNS:
+            chat_history = chat_history[-MAX_HISTORY_TURNS:]
+        
+        print(f"Assistant: {result}\n")
+        
+    except Exception as e:
+        logger.error(f"Error processing question: {e}")
+        print(f"ERROR: {e}\n")

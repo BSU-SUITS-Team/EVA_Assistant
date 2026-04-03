@@ -1,123 +1,161 @@
 # EVA Assistant
-Local chatbot powered by Ollama. Implements a **Retrieval-Augmented Generation (RAG)** pipeline for mission-critical telemetry quireies.
+Local chatbot powered by Ollama. Fetches live telemetry from your HTTPS server and performs arithmetic calculations for mission-critical queries.
 
 ## Prerequisites
 * Python 3.8+
 * pip (Python package installer)
+* Ollama (for LLM inference)
 
 ## Dependencies
-* Ollama
-  * Stored locally on machine to run chatbot
-* LangChain
-  * Open-source framework with pre-built agent architecture and integrations
-* Chroma
-  * Vector store database
-* Pandas
-  * Library to read in files
+* **Ollama**
+  * Local LLM runtime for Mistral 7B model
+* **LangChain**
+  * Framework for LLM prompt engineering and chaining
+* **Requests**
+  * HTTP library for fetching telemetry from server
+
+See [requirements.txt](requirements.txt) for full list.
+
+## Architecture
+
+The EVA Assistant uses a **direct data access** approach (no vector database):
+
+1. **Background Polling** — Fetches telemetry from server every 1 second (matching frontend)
+2. **Live Data** — Always passes current telemetry to LLM
+3. **Arithmetic Only** — Mistral performs calculations on real values
+4. **Thread-Safe** — Background thread + main thread coordinate via locks
+
+For detailed data sync configuration, see [DATA_SYNC.md](DATA_SYNC.md).
 
 ## Usage
 
-This project runs through a venv virtual environment in order to keep dependencies from interfering with other local projects.
-
 ### Python Setup/Installation
-In the command terminal, you will need to load into the virtual environment first, before installing packages. To do this:
 
-Linux/MAC:
-```console
-$ ./venv/bin/activate
-$ pip install -r ./requirements.txt
+This project runs through a venv virtual environment to keep dependencies isolated:
+
+Linux/macOS:
+```bash
+./venv/bin/activate
+pip install -r ./requirements.txt
 ```
 
 Windows:
-```console
-$ ./venv/Scripts/activate
-$ pip install -r ./requirements.txt
+```bash
+./venv/Scripts/activate
+pip install -r ./requirements.txt
 ```
-After running this, the required dependencies will be installed into the virtual environment to use.
 
 ### Ollama Setup
-Next, to be able to locally run a model, you will need to download [Ollama](https://ollama.com/) from their website. 
-This EVA assitant uses the llama3.2 model, as well as an embedding model mxbai-embed-large. We will download these from the console using the ollama command.
 
-```console
-$ ollama pull llama3.2
-pulling manifest
-...
-success
-$ ollama pull mxbai-embed-large
-pulling manifest
-...
-success
-```
-### Starting Chat (currently in terminal)
-To run the chat in the terminal:
+Download [Ollama](https://ollama.com/) from their website and install.
 
-Linx/MAC:
-```console
-$ cd ./src
-$ python3 main.py
+Then pull the Mistral model (used for LLM inference):
+```bash
+ollama pull mistral
 ```
-Windows:
-```console
-$ cd src
-$ python main.py
+
+Start the Ollama server (before running the assistant):
+```bash
+ollama serve
 ```
+
+This runs in the background on `localhost:11434` by default.
+
+### Running the Assistant
+
+```bash
+cd src
+python3 main.py
+```
+
+The assistant will:
+1. Start background polling (fetches server data every 1 second)
+2. Connect to Ollama for LLM inference
+3. Accept questions and return arithmetic results
+
+### Configuration
+
+Set environment variables to customize behavior:
+
+```bash
+# Change server URL (defaults to http://192.168.0.11:14141)
+export TELEMETRY_SERVER_BASE="http://your-server:port"
+
+# Then run
+python3 main.py
+```
+
+For more options, see [DATA_SYNC.md](DATA_SYNC.md).
 
 ## Core Components
-1. **LLM Layer (main.py)**
-* Uses Ollama with llama3.2 model
-* Structured using LangChain's ChatPromptTemplate
-* Role-based prompt that frames responses w/ astronaut support context
 
-2. **Vector Database Layer (vector.py)**
-* **Embedding Model:** mxbai-embed-large (Ollama embeddings)
-* **Vector Store:** Chroma w/ persistent storage at chroma-langchain_db (absolute path)
-* **Retriever:** Dynamic k=5-10 semantic search (adapts to available documents)
-* **Document Strategy:** Subsystem-based grouping for related field coherence
+1. **LLM Layer** ([main.py](src/main.py))
+   - Uses Ollama with Mistral 7B model
+   - LangChain ChatPromptTemplate for prompt engineering
+   - Configured for arithmetic-only calculations with temperature=0.0
 
-3. **Data Processing Pipeline**
-* **Input:** JSON telemetry files from ./data directory
-* **Transformation:** Groups related telemetry fields by subsystem (oxygen_system, power_system, co2_removal, cooling_system, biometrics, mission_time)
-* **Indexing:** Creates two types of documents per EVA session:
-  - **Full telemetry:** Complete dataset for "give me all data" queries
-  - **Subsystem documents:** Grouped fields for system-specific queries and calculations
-* **Storage:** Only new documents are added (deduplication by document ID)
-* **Logging:** Tracks document loading, retrieval, and database health
+2. **Data Layer** ([telemetry.py](src/telemetry.py))
+   - Fetches EVA.json, ROVER.json, LTV.json from `/data/` endpoint
+   - Background daemon thread polls every 1 second
+   - Thread-safe access to current telemetry data
+   - Automatic retry on fetch failure
+
+3. **Data Format**
+   - Input: Nested JSON from server
+   - Transform: Flatten to readable text format
+   - Output: Direct to LLM (no indexing or ranking)
 
 ## Execution Flow
-User Question
 
-↓
+```
+┌─ Background Thread ──────────────────────┐
+│ Every 1 second:                          │
+│ Fetch EVA.json, ROVER.json, LTV.json    │
+│ Merge into _current_telemetry            │
+└──────────────────────────────────────────┘
+                ↓
+          User Question
+                ↓
+      get_current_telemetry()
+                ↓
+     format_telemetry_for_llm()
+                ↓
+        LLM Arithmetic Chain
+                ↓
+         Return Answer
+```
 
-[Retriever] → Semantic search in vector DB → Most relevant subsystem/full telemetry documents
+## Example Usage
 
-↓
+```
+Ask your question (q to quit): What is the primary oxygen storage for EVA1?
 
-[Formatter] → Organize retrieved documents, prioritize full telemetry for complete datasets
+Telemetry data:
+[TELEMETRY]
+  telemetry.eva1.oxy_pri_storage: 85.2
 
-↓
-
-[LLM Chain] → Generate response with complete subsystem context (enables calculations)
-
-↓
-
-[Memory] → Store Q&A pair (max 6 turns kept in history)
-
-## Key Improvements
-* **Better Calculations:** Subsystem grouping ensures all related data (e.g., oxygen storage + consumption rate) is retrieved together for accurate computations
-* **Full Telemetry Support:** Complete EVA datasets available in a single document for comprehensive queries
-* **Robust Paths:** Absolute path resolution prevents database lookup failures due to working directory changes
-* **Enhanced Debugging:** Logging throughout pipeline tracks retrieval and document processing for troubleshooting
-* **Dynamic Retrieval:** k parameter adapts to available documents, preventing under-retrieval
+Answer: The primary oxygen storage for EVA1 is 85.2%
+```
 
 ## Troubleshooting
-* **Stale Data:** Delete `chroma-langchain_db/` folder and re-run `main.py` to rebuild the vector database with new subsystem structure
-* **Missing Telemetry:** Check console logs for data loading errors; ensure `data/*.json` files are valid JSON
-* **No Results:** Verify Ollama server is running and models (llama3.2, mxbai-embed-large) are installed
 
-## Future Updates
-* Persistent conversation history backend for multi-session context
-* Prompt optimization with different designs and Ollama CLI parameters
-* Web UI frontend for easier interaction
-* Support for additional telemetry formats and real-time data streams
-* Temperature and other LLM parameter tuning for calculation accuracy
+**"Failed to connect to Ollama"**
+- Make sure Ollama is running: `ollama serve`
+
+**"Failed to fetch telemetry"**
+- Check server is running and accessible
+- Verify `TELEMETRY_SERVER_BASE` is correct
+- Test with: `curl http://192.168.0.11:14141/data/EVA.json`
+
+**LLM returns "not provided"**
+- Verify field exists in server telemetry
+- Check exact field name (case-sensitive)
+- Review debug logs for actual data fetched
+
+## Future Enhancements
+
+* Add vector database layer for semantic search (if needed)
+* Implement UDP socket communication for commands
+* Add conversation history persistence
+* Optimize LLM prompts for specific mission contexts
+* Add alert/anomaly detection thresholds
