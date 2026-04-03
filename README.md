@@ -78,7 +78,7 @@ The assistant will:
 Set environment variables to customize behavior:
 
 ```bash
-# Change server URL (defaults to http://192.168.0.11:14141)
+# Change server URL (defaults to http://localhost:11434)
 export TELEMETRY_SERVER_BASE="http://your-server:port"
 
 # Then run
@@ -145,7 +145,7 @@ Answer: The primary oxygen storage for EVA1 is 85.2%
 **"Failed to fetch telemetry"**
 - Check server is running and accessible
 - Verify `TELEMETRY_SERVER_BASE` is correct
-- Test with: `curl http://192.168.0.11:14141/data/EVA.json`
+- Test with: `curl http://localhost:11434/data/EVA.json`
 
 **LLM returns "not provided"**
 - Verify field exists in server telemetry
