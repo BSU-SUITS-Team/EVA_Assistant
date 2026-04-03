@@ -6,7 +6,7 @@ import logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-model = OllamaLLM(model="llama3.2")
+model = OllamaLLM(model="mistral")
 MAX_HISTORY_TURNS = 6
 
 '''
