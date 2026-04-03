@@ -1,5 +1,5 @@
 # EVA Assistant
-Local chatbot powered by Ollama. Fetches live telemetry from your HTTPS server and performs arithmetic calculations for mission-critical queries.
+Local chatbot powered by Ollama. Fetches live telemetry from HTTPS server and performs arithmetic calculations for mission-critical queries.
 
 ## Prerequisites
 * Python 3.8+
