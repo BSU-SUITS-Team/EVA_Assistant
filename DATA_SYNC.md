@@ -13,7 +13,7 @@ The EVA Assistant now fetches telemetry data directly from your HTTPS server eve
 ## Architecture
 
 ```
-Server (192.168.0.11:14141)
+Server (localhost:11434)
     ↓
 /data/EVA.json, /data/ROVER.json, /data/LTV.json
     ↓
@@ -32,8 +32,8 @@ Set environment variables to control data sync behavior:
 
 ### Server Configuration
 ```bash
-# HTTPS server base URL (defaults to http://192.168.0.11:14141)
-export TELEMETRY_SERVER_BASE="http://192.168.0.11:14141"
+# HTTPS server base URL (defaults to http://localhost:11434)
+export TELEMETRY_SERVER_BASE="http://localhost:11434"
 ```
 
 **Note**: Polling interval is hardcoded to 1 second in [src/telemetry.py](src/telemetry.py) to match frontend. Modify `POLL_INTERVAL_SECONDS` in the file to change.
@@ -113,7 +113,7 @@ logging.basicConfig(level=logging.DEBUG)
 ## Troubleshooting
 
 **"Failed to fetch telemetry" errors:**
-- Check server is running: `curl http://192.168.0.11:14141/data/EVA.json`
+- Check server is running: `curl http://localhost:11434/data/EVA.json`
 - Verify `TELEMETRY_SERVER_BASE` is correct
 - Check network connectivity
 
