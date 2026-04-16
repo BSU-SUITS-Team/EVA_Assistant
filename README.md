@@ -154,8 +154,16 @@ Answer: The primary oxygen storage for EVA1 is 85.2%
 
 ## Future Enhancements
 
-* Add vector database layer for semantic search (if needed)
-* Implement UDP socket communication for commands
-* Add conversation history persistence
-* Optimize LLM prompts for specific mission contexts
-* Add alert/anomaly detection thresholds
+* Add schema validation in telemetry.py before anything reaches the model. Define required fields, types, units, and valid ranges, and reject or flag anything that does not match.
+
+* Stop relying on flattened prose for reasoning in main.py. Keep the raw structured telemetry available, and pass the model a compact, explicit structure with field paths and units so it cannot easily mix values together.
+
+* Move arithmetic out of the model. If the question is numeric, calculate it in Python and have the model only explain or format the result.
+
+* Add a post-answer verifier. Check that every number in the response exists in the source telemetry and that the units and field names line up before printing the answer.
+
+* Improve failure handling at startup and during polling in telemetry.py. Right now the app exits if initial fetch fails; that is brittle. It should either retry, fall back cleanly, or keep running in a degraded state.
+
+* Keep the local model, but choose a stronger instruction-tuned one if possible. Mistral can work, but for strict structured answers, test Qwen2.5 Instruct or Llama 3.1 Instruct locally, then compare which one makes fewer field-misread errors at temperature 0.0.
+
+* Add tests for the failure modes that matter most. Focus on missing fields, swapped labels, stale telemetry, malformed JSON, and unit mismatches in the files under tests.
