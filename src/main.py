@@ -19,13 +19,74 @@ MAX_HISTORY_TURNS = 6
 
 # Field-level metadata used to attach explicit units/labels.
 FIELD_METADATA = {
+    # Battery fields
+    "battery": {"unit": "%", "label": "Battery"},
+    "battery_level": {"unit": "%", "label": "Battery level"},
+    "primary_battery_level": {"unit": "%", "label": "Primary battery level"},
+    "secondary_battery_level": {"unit": "%", "label": "Secondary battery level"},
+    
+    # Oxygen storage
     "oxy_pri_storage": {"unit": "%", "label": "Primary O2 storage"},
     "oxy_sec_storage": {"unit": "%", "label": "Secondary O2 storage"},
+    
+    # Oxygen pressure
     "oxy_pri_pressure": {"unit": "psi", "label": "Primary O2 pressure"},
     "oxy_sec_pressure": {"unit": "psi", "label": "Secondary O2 pressure"},
-    "heart_rate": {"unit": "bpm", "label": "Heart rate"},
-    "battery": {"unit": "%", "label": "Battery"},
+    
+    # Oxygen consumption
+    "oxy_consumption": {"unit": "psi/min", "label": "O2 consumption"},
+    "oxy_pri_consumption": {"unit": "psi/min", "label": "Primary O2 consumption"},
+    
+    # CO2
+    "co2_production": {"unit": "psi/min", "label": "CO2 production"},
+    "co2_pressure": {"unit": "psi", "label": "CO2 pressure"},
+    "suit_pressure_co2": {"unit": "psi", "label": "Suit CO2 pressure"},
+    "helmet_pressure_co2": {"unit": "psi", "label": "Helmet CO2 pressure"},
+    "suit_pressure_other": {"unit": "psi", "label": "Suit pressure other"},
+    
+    # Suit pressure
     "suit_pressure": {"unit": "psi", "label": "Suit pressure"},
+    "suit_pressure_oxy": {"unit": "psi", "label": "Suit O2 pressure"},
+    "suit_pressure_co2": {"unit": "psi", "label": "Suit CO2 pressure"},
+    "suit_pressure_total": {"unit": "psi", "label": "Suit total pressure"},
+    
+    # Fans
+    "primary_fan": {"unit": "rpm", "label": "Primary fan"},
+    "secondary_fan": {"unit": "rpm", "label": "Secondary fan"},
+    "fan_pri_rpm": {"unit": "rpm", "label": "Primary fan"},
+    "fan_sec_rpm": {"unit": "rpm", "label": "Secondary fan"},
+    
+    # Scrubbers
+    "scrubber_primary": {"unit": "%", "label": "Scrubber primary"},
+    "scrubber_secondary": {"unit": "%", "label": "Scrubber secondary"},
+    "scrubber_a_co2_storage": {"unit": "%", "label": "Scrubber A CO2 storage"},
+    "scrubber_b_co2_storage": {"unit": "%", "label": "Scrubber B CO2 storage"},
+    
+    # Temperature
+    "temperature": {"unit": "°C", "label": "Temperature"},
+    "external_temp": {"unit": "°C", "label": "External temperature"},
+    
+    # Coolant
+    "coolant_storage": {"unit": "%", "label": "Coolant storage"},
+    "coolant_liquid_pressure": {"unit": "psi", "label": "Coolant liquid pressure"},
+    "coolant_gas_pressure": {"unit": "psi", "label": "Coolant gas pressure"},
+    
+    # Biometrics
+    "heart_rate": {"unit": "bpm", "label": "Heart rate"},
+    
+    # Location
+    "posx": {"unit": "m", "label": "X coordinate"},
+    "posy": {"unit": "m", "label": "Y coordinate"},
+    "heading": {"unit": "°", "label": "Heading"},
+    "rover_pos_x": {"unit": "m", "label": "Rover X coordinate"},
+    "rover_pos_y": {"unit": "m", "label": "Rover Y coordinate"},
+    "last_known_x": {"unit": "m", "label": "Last known X"},
+    "last_known_y": {"unit": "m", "label": "Last known Y"},
+    
+    # Rover telemetry
+    "oxygen_storage": {"unit": "%", "label": "Oxygen storage"},
+    "oxygen_pressure": {"unit": "psi", "label": "Oxygen pressure"},
+    "oxygen_tank": {"unit": "%", "label": "Oxygen tank"},
 }
 
 
@@ -141,33 +202,133 @@ def _extract_numeric_value(value: Any) -> Optional[float]:
 
 def _field_aliases() -> Dict[str, List[str]]:
     return {
+        # Battery fields
+        "battery": ["battery", "battery level", "battery charge", "battery percentage"],
+        "battery_level": ["battery level", "battery charge", "battery percentage"],
+        "primary_battery_level": ["primary battery level", "primary battery", "battery level", "battery percentage"],
+        "secondary_battery_level": ["secondary battery level", "secondary battery"],
+        
+        # Oxygen storage
         "oxy_pri_storage": ["primary o2 storage", "primary oxygen storage", "pri o2 storage", "o2 storage"],
         "oxy_sec_storage": ["secondary o2 storage", "secondary oxygen storage", "sec o2 storage"],
+        
+        # Oxygen pressure
         "oxy_pri_pressure": ["primary o2 pressure", "primary oxygen pressure", "pri o2 pressure", "o2 pressure", "primary pressure"],
         "oxy_sec_pressure": ["secondary o2 pressure", "secondary oxygen pressure", "sec o2 pressure", "secondary pressure"],
+        
+        # Oxygen consumption
         "oxy_pri_consumption": ["primary o2 consumption", "primary oxygen consumption", "o2 consumption", "consumption"],
         "oxy_consumption": ["o2 consumption", "oxygen consumption", "consumption rate", "consumption"],
-        "battery": ["battery", "battery level", "battery charge", "battery percentage"],
-        "primary_battery_level": ["primary battery level", "battery level", "battery percentage", "battery charge"],
-        "heart_rate": ["heart rate", "pulse"],
-        "suit_pressure": ["suit pressure", "pressure"],
-        "co2_pressure": ["co2 pressure", "co2 partial pressure", "carbon dioxide pressure", "suit co2 pressure"],
-        "suit_pressure_co2": ["co2 pressure", "co2 partial pressure", "carbon dioxide pressure", "suit co2 pressure"],
+        
+        # CO2
         "co2_production": ["co2 production", "carbon dioxide production"],
+        "co2_pressure": ["co2 pressure", "co2 partial pressure", "carbon dioxide pressure"],
+        "suit_pressure_co2": ["suit co2 pressure", "co2 pressure", "co2 partial pressure"],
+        "helmet_pressure_co2": ["helmet co2 pressure", "co2 pressure"],
+        
+        # Suit pressure
+        "suit_pressure": ["suit pressure", "pressure"],
+        "suit_pressure_oxy": ["suit o2 pressure", "suit oxygen pressure", "suit oxy pressure"],
+        "suit_pressure_co2": ["suit co2 pressure"],
+        "suit_pressure_total": ["suit total pressure", "total pressure"],
+        "suit_pressure_other": ["suit other pressure", "suit unknown pressure"],
+        
+        # Fans
+        "primary_fan": ["primary fan", "fan speed", "primary fan speed"],
+        "secondary_fan": ["secondary fan", "secondary fan speed"],
+        "fan_pri_rpm": ["primary fan", "fan speed", "primary fan speed", "fan rpm"],
+        "fan_sec_rpm": ["secondary fan", "secondary fan speed", "fan rpm"],
+        
+        # Scrubbers
+        "scrubber_primary": ["scrubber primary", "primary scrubber", "scrubber", "primary scrubber efficiency"],
+        "scrubber_secondary": ["scrubber secondary", "secondary scrubber"],
+        "scrubber_a_co2_storage": ["scrubber a", "scrubber primary", "scrubber co2"],
+        "scrubber_b_co2_storage": ["scrubber b", "scrubber secondary", "scrubber co2"],
+        
+        # Temperature
+        "temperature": ["temperature", "temp", "suit temperature"],
+        "external_temp": ["external temperature", "external temp"],
+        
+        # Coolant
+        "coolant_storage": ["coolant storage", "coolant reserve", "coolant tank"],
+        "coolant_liquid_pressure": ["coolant liquid pressure", "coolant pressure"],
+        "coolant_gas_pressure": ["coolant gas pressure"],
+        
+        # Biometrics
+        "heart_rate": ["heart rate", "pulse", "heart beat"],
+        
+        # Location
+        "posx": ["x coordinate", "x position", "x location", "position x", "eva x"],
+        "posy": ["y coordinate", "y position", "y location", "position y", "eva y"],
+        "heading": ["heading", "direction", "bearing"],
+        "rover_pos_x": ["rover x", "rover x coordinate", "rover position x"],
+        "rover_pos_y": ["rover y", "rover y coordinate", "rover position y"],
+        "last_known_x": ["last known x", "last x", "ltv x"],
+        "last_known_y": ["last known y", "last y", "ltv y"],
+        "oxygen_storage": ["rover oxygen storage", "oxygen storage", "o2 storage"],
+        "oxygen_pressure": ["rover oxygen pressure", "oxygen pressure", "o2 pressure"],
+        "oxygen_tank": ["oxygen tank"],
     }
 
 
 def _direct_field_candidates(question: str) -> List[str]:
     normalized_question = _normalize_question(question)
 
+    if "battery" in normalized_question:
+        return ["battery", "battery_level", "primary_battery_level", "secondary_battery_level"]
+
+    if "fan" in normalized_question:
+        if "secondary" in normalized_question or "sec" in normalized_question:
+            return ["secondary_fan", "fan_sec_rpm"]
+        if "primary" in normalized_question or "pri" in normalized_question:
+            return ["primary_fan", "fan_pri_rpm"]
+        return ["primary_fan", "fan_pri_rpm", "secondary_fan", "fan_sec_rpm"]
+
+    if "scrubber" in normalized_question:
+        if "secondary" in normalized_question or "sec" in normalized_question or "b" in normalized_question:
+            return ["scrubber_secondary", "scrubber_b_co2_storage"]
+        if "primary" in normalized_question or "pri" in normalized_question or "a" in normalized_question:
+            return ["scrubber_primary", "scrubber_a_co2_storage"]
+        return ["scrubber_primary", "scrubber_a_co2_storage", "scrubber_secondary", "scrubber_b_co2_storage"]
+
+    if "coolant" in normalized_question:
+        if "liquid" in normalized_question or "pressure" in normalized_question:
+            return ["coolant_liquid_pressure", "coolant_gas_pressure"]
+        if "storage" in normalized_question:
+            return ["coolant_storage"]
+        return ["coolant_storage", "coolant_liquid_pressure", "coolant_gas_pressure"]
+
+    if "temperature" in normalized_question or "temp" in normalized_question:
+        return ["temperature"]
+
+    if "heading" in normalized_question or "direction" in normalized_question:
+        return ["heading"]
+
+    if "coordinate" in normalized_question or "location" in normalized_question or "position" in normalized_question:
+        # For "coordinates" plural, return both x and y
+        if "coordinates" in normalized_question or ("coordinate" in normalized_question and "x" not in normalized_question and "y" not in normalized_question):
+            return ["posx", "posy"]
+        if "x" in normalized_question:
+            return ["posx", "rover_pos_x", "last_known_x"]
+        if "y" in normalized_question:
+            return ["posy", "rover_pos_y", "last_known_y"]
+        return ["posx", "posy", "rover_pos_x", "rover_pos_y", "heading"]
+
     if "co2" in normalized_question and "pressure" in normalized_question:
         return ["suit_pressure_co2", "helmet_pressure_co2", "co2_pressure"]
+
+    if "co2" in normalized_question and "production" in normalized_question:
+        return ["co2_production"]
 
     if "pressure" in normalized_question:
         if "secondary" in normalized_question or "sec" in normalized_question:
             return ["oxy_sec_pressure"]
         if "primary" in normalized_question or "pri" in normalized_question or "o2" in normalized_question or "oxygen" in normalized_question:
             return ["oxy_pri_pressure"]
+        if "suit" in normalized_question or "total" in normalized_question:
+            return ["suit_pressure_total", "suit_pressure", "suit_pressure_oxy", "suit_pressure_co2"]
+        if "helmet" in normalized_question:
+            return ["helmet_pressure_co2"]
         return ["oxy_pri_pressure", "oxy_sec_pressure"]
 
     if "storage" in normalized_question:
@@ -175,10 +336,15 @@ def _direct_field_candidates(question: str) -> List[str]:
             return ["oxy_sec_storage"]
         if "primary" in normalized_question or "pri" in normalized_question or "o2" in normalized_question or "oxygen" in normalized_question:
             return ["oxy_pri_storage"]
+        if "coolant" in normalized_question:
+            return ["coolant_storage"]
         return ["oxy_pri_storage", "oxy_sec_storage"]
 
     if any(token in normalized_question for token in ["consumption", "consume", "consumed", "usage", "draw"]):
         return ["oxy_consumption", "oxy_pri_consumption"]
+
+    if "heart rate" in normalized_question or "pulse" in normalized_question:
+        return ["heart_rate"]
 
     return []
 
@@ -189,6 +355,10 @@ def _find_direct_matches(question: str, rows: List[Dict[str, Any]]) -> List[Dict
         return []
 
     matched: List[Dict[str, Any]] = []
+    
+    # For coordinates, we want to collect ALL candidate matches (both x and y)
+    is_coordinates_query = ("coordinate" in question.lower() or "position" in question.lower()) and "x" not in question.lower() and "y" not in question.lower()
+    
     for candidate in candidates:
         for row in rows:
             field_key = str(row.get("field_key", "")).lower()
@@ -200,10 +370,11 @@ def _find_direct_matches(question: str, rows: List[Dict[str, Any]]) -> List[Dict
             elif candidate.replace("_", " ") in label:
                 matched.append(row)
 
-        if matched:
+        # For non-coordinate queries, return after first candidate match
+        if matched and not is_coordinates_query:
             return matched
 
-    return []
+    return matched
 
 
 def _question_matches_field(question: str, row: Dict[str, Any]) -> bool:
@@ -229,7 +400,11 @@ def _question_matches_field(question: str, row: Dict[str, Any]) -> bool:
                 return True
 
     # Then token overlap, but require the core topic token to be present.
-    core_tokens = {"battery", "pressure", "storage", "heart", "co2", "oxygen", "o2", "production"}
+    core_tokens = {
+        "battery", "pressure", "storage", "heart", "co2", "oxygen", "o2", "production",
+        "fan", "scrubber", "coolant", "temperature", "temp", "coordinate", "location",
+        "heading", "direction", "bearing", "consumption", "consume"
+    }
     if not (question_tokens & core_tokens):
         return False
 
@@ -496,6 +671,36 @@ def resolve_question(question: str, telemetry_data: Dict[str, Any]) -> Tuple[Tel
 
     q = _normalize_question(question)
 
+    # Special handling for coordinate questions - return both x and y if not specified
+    if ("coordinate" in q or "position" in q or "location" in q) and "x" not in q and "y" not in q and "heading" not in q:
+        x_row = None
+        y_row = None
+        for row in matched_rows:
+            field_key = str(row.get("field_key", "")).lower()
+            if field_key == "posx":
+                x_row = row
+            elif field_key == "posy":
+                y_row = row
+        
+        if x_row and y_row:
+            x_val = _extract_numeric_value(x_row.get("value"))
+            y_val = _extract_numeric_value(y_row.get("value"))
+            entity = _extract_entity_label(str(x_row.get("field_path", "")))
+            
+            if x_val is not None and y_val is not None:
+                coord_str = f"({x_val}, {y_val})"
+                return (
+                    TelemetryAnswer(
+                        coord_str,
+                        "m",
+                        "coordinates",
+                        entity,
+                        f"{x_row.get('field_path')} / {y_row.get('field_path')}",
+                        "string",
+                    ),
+                    matched_rows,
+                )
+
     if _is_time_to_threshold_question(question):
         current_row = matched_rows[0]
         current_value = _extract_numeric_value(current_row.get("value"))
@@ -647,53 +852,54 @@ def build_question_context(question: str, telemetry_data: Dict[str, Any]) -> str
 chat_history = []
 
 # Main loop
-print("\n" + "=" * 60)
-print("EVA Assistant (Live Telemetry Mode)")
-print("=" * 60)
-
-# Start background polling
-print("\nInitializing telemetry polling...")
-if not start_polling():
-    print("ERROR: Could not start telemetry polling. Exiting.")
-    exit(1)
-
-print("Telemetry polling active (updates every 1 second)\n")
-
-# Question loop
-while True:
+if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("EVA Assistant (Live Telemetry Mode)")
     print("=" * 60)
-    question = input("Ask your question (q to quit): ").strip()
-    print()
 
-    if question.lower() == "q":
-        print("Exiting assistant. Goodbye!")
-        break
+    # Start background polling
+    print("\nInitializing telemetry polling...")
+    if not start_polling():
+        print("ERROR: Could not start telemetry polling. Exiting.")
+        exit(1)
 
-    if not question:
-        print("Please enter a question.")
-        continue
+    print("Telemetry polling active (updates every 1 second)\n")
 
-    try:
-        telemetry_data = get_current_telemetry()
-        if not telemetry_data:
-            print("ERROR: No telemetry data available\n")
+    # Question loop
+    while True:
+        print("=" * 60)
+        question = input("Ask your question (q to quit): ").strip()
+        print()
+
+        if question.lower() == "q":
+            print("Exiting assistant. Goodbye!")
+            break
+
+        if not question:
+            print("Please enter a question.")
             continue
 
-        telemetry_context = build_question_context(question, telemetry_data)
-        if telemetry_context == "[]":
-            print("Assistant: not provided\n")
-            continue
+        try:
+            telemetry_data = get_current_telemetry()
+            if not telemetry_data:
+                print("ERROR: No telemetry data available\n")
+                continue
 
-        logger.info("Processing question: %s", question)
-        result, matched_rows = resolve_question(question, telemetry_data)
-        result_text = format_answer(result)
+            telemetry_context = build_question_context(question, telemetry_data)
+            if telemetry_context == "[]":
+                print("Assistant: not provided\n")
+                continue
 
-        chat_history.append({"question": question, "answer": result_text})
-        if len(chat_history) > MAX_HISTORY_TURNS:
-            chat_history = chat_history[-MAX_HISTORY_TURNS:]
+            logger.info("Processing question: %s", question)
+            result, matched_rows = resolve_question(question, telemetry_data)
+            result_text = format_answer(result)
 
-        print(f"Assistant: {result_text}\n")
+            chat_history.append({"question": question, "answer": result_text})
+            if len(chat_history) > MAX_HISTORY_TURNS:
+                chat_history = chat_history[-MAX_HISTORY_TURNS:]
 
-    except Exception as e:
-        logger.error("Error processing question: %s", e)
-        print(f"ERROR: {e}\n")
+            print(f"Assistant: {result_text}\n")
+
+        except Exception as e:
+            logger.error("Error processing question: %s", e)
+            print(f"ERROR: {e}\n")
