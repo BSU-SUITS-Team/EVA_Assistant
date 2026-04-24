@@ -285,9 +285,9 @@ def _direct_field_candidates(question: str) -> List[str]:
         return ["primary_fan", "fan_pri_rpm", "secondary_fan", "fan_sec_rpm"]
 
     if "scrubber" in normalized_question:
-        if "secondary" in normalized_question or "sec" in normalized_question or "b" in normalized_question:
+        if "secondary" in normalized_question or "sec" in normalized_question or " b" in normalized_question or "b " in normalized_question or normalized_question.endswith("b"):
             return ["scrubber_secondary", "scrubber_b_co2_storage"]
-        if "primary" in normalized_question or "pri" in normalized_question or "a" in normalized_question:
+        if "primary" in normalized_question or "pri" in normalized_question or " a" in normalized_question or "a " in normalized_question or normalized_question.endswith("a"):
             return ["scrubber_primary", "scrubber_a_co2_storage"]
         return ["scrubber_primary", "scrubber_a_co2_storage", "scrubber_secondary", "scrubber_b_co2_storage"]
 
@@ -372,8 +372,16 @@ def _find_direct_matches(question: str, rows: List[Dict[str, Any]]) -> List[Dict
 
         # For non-coordinate queries, return after first candidate match
         if matched and not is_coordinates_query:
-            return matched
+            # Filter by requested entity if specified
+            requested_entity = _extract_requested_entity(question)
+            filtered = _filter_rows_by_entity(matched, requested_entity)
+            return filtered
 
+    # For coordinate queries, filter by entity
+    if matched:
+        requested_entity = _extract_requested_entity(question)
+        return _filter_rows_by_entity(matched, requested_entity)
+    
     return matched
 
 
@@ -581,7 +589,11 @@ def _match_field_rows(question: str, rows: List[Dict[str, Any]]) -> List[Dict[st
 
     # Keep the strongest matches only.
     if matched_rows:
-        scored = [(_score_row(question_tokens, row), row) for row in matched_rows]
+        # Filter by requested entity if specified
+        requested_entity = _extract_requested_entity(question)
+        entity_filtered = _filter_rows_by_entity(matched_rows, requested_entity)
+        
+        scored = [(_score_row(question_tokens, row), row) for row in entity_filtered]
         best_score = max(score for score, _ in scored)
         top_rows = [row for score, row in scored if score == best_score]
 
@@ -658,6 +670,26 @@ def _extract_entity_label(field_path: str) -> str:
             return candidate.upper()
         return candidate.upper()
     return "UNKNOWN"
+
+
+def _extract_requested_entity(question: str) -> Optional[str]:
+    """Extract EVA1 or EVA2 from question if specified."""
+    normalized = question.lower()
+    if "eva1" in normalized or "eva 1" in normalized:
+        return "eva1"
+    if "eva2" in normalized or "eva 2" in normalized:
+        return "eva2"
+    return None
+
+
+def _filter_rows_by_entity(rows: List[Dict[str, Any]], entity: str) -> List[Dict[str, Any]]:
+    """Filter rows to match the specified entity (eva1 or eva2)."""
+    if not entity:
+        return rows
+    
+    entity_lower = entity.lower()
+    filtered = [row for row in rows if entity_lower in str(row.get("field_path", "")).lower()]
+    return filtered if filtered else rows  # Return all if none match
 
 
 def resolve_question(question: str, telemetry_data: Dict[str, Any]) -> Tuple[TelemetryAnswer, List[Dict[str, Any]]]:
