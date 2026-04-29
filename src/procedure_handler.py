@@ -6,7 +6,8 @@ Provides human-readable guidance with confirmation flow.
 import logging
 from typing import Optional, Tuple
 
-from procedures import Procedure, get_procedure, is_procedure_request
+from procedures import Procedure, is_procedure_request, get_procedure as get_local_procedure
+from procedure_store import get_procedure as get_remote_procedure
 
 logger = logging.getLogger(__name__)
 
@@ -92,48 +93,48 @@ def handle_procedure_request(question: str) -> Optional[str]:
     """
     if not is_procedure_request(question):
         return None
-    
+
     # Try to extract procedure name from question
     question_lower = question.lower()
-    
-    # Direct matches for egress
+
+    # Direct matches for egress (prefer remote authoritative TSS if configured)
     if "egress" in question_lower:
-        proc = get_procedure("egress")
+        proc = get_remote_procedure("egress", requester="assistant", fallback=get_local_procedure("egress"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
-    
+
     # LTV Exit Recovery Mode
     if "exit recovery" in question_lower or "erp" in question_lower or "erm" in question_lower:
-        proc = get_procedure("exit_recovery_mode")
+        proc = get_remote_procedure("exit_recovery_mode", requester="assistant", fallback=get_local_procedure("exit_recovery_mode"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
-    
+
     # LTV System Diagnosis
     if "diagnosis" in question_lower or "diagnose" in question_lower:
-        proc = get_procedure("system_diagnosis")
+        proc = get_remote_procedure("system_diagnosis", requester="assistant", fallback=get_local_procedure("system_diagnosis"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
-    
+
     # LTV Bus Connector Repair
     if "bus connector" in question_lower or "connector" in question_lower:
-        proc = get_procedure("bus_connector")
+        proc = get_remote_procedure("bus_connector", requester="assistant", fallback=get_local_procedure("bus_connector"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
-    
+
     # LTV Dust Sensor Replacement
     if "dust sensor" in question_lower or "sensor replacement" in question_lower:
-        proc = get_procedure("dust_sensor")
+        proc = get_remote_procedure("dust_sensor", requester="assistant", fallback=get_local_procedure("dust_sensor"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
-    
+
     # LTV Final Verification
     if "final verification" in question_lower or "verification" in question_lower:
-        proc = get_procedure("verification")
+        proc = get_remote_procedure("verification", requester="assistant", fallback=get_local_procedure("verification"))
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
