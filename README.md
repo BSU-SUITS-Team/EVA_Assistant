@@ -234,8 +234,6 @@ Answer: 96.45924377441406%
 - [ ] Add LTV diagnosis and repair procedure guidance with voice walkthrough
 - [ ] Add predictive maximum range calculation based on consumable rates (O₂, coolant)
 - [ ] Add caution/warning trigger system with recommended corrective procedures
-- [ ] Add hazard detection and alternate route alerts for EVA navigation
-- [ ] Add breadcrumb navigation tracking for return-to-rover (ingress)
 - [ ] Expand procedure database with additional mission tasks and checklists
 - [ ] Expand the alias map in [src/main.py](src/main.py) for more telemetry field names and question phrasing
 - [ ] Add comprehensive test suite for failure modes: missing fields, swapped labels, stale telemetry, malformed JSON, unit mismatches
