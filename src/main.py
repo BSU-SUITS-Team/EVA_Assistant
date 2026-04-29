@@ -7,6 +7,7 @@ Fetches telemetry every second in background
 import logging
 
 from answer_formatter import _format_answer_with_llm, build_question_context
+from procedure_handler import handle_procedure_request
 from question_resolver import resolve_question
 from telemetry import get_current_telemetry, start_polling
 
@@ -47,6 +48,16 @@ if __name__ == "__main__":
             continue
 
         try:
+            # Check if this is a procedure request first
+            procedure_response = handle_procedure_request(question)
+            if procedure_response:
+                print(f"Assistant: {procedure_response}\n")
+                chat_history.append({"question": question, "answer": procedure_response})
+                if len(chat_history) > MAX_HISTORY_TURNS:
+                    chat_history = chat_history[-MAX_HISTORY_TURNS:]
+                continue
+
+            # Otherwise, treat as telemetry/data question
             telemetry_data = get_current_telemetry()
             if not telemetry_data:
                 print("ERROR: No telemetry data available\n")
