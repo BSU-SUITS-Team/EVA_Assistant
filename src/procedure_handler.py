@@ -96,16 +96,64 @@ def handle_procedure_request(question: str) -> Optional[str]:
     # Try to extract procedure name from question
     question_lower = question.lower()
     
-    # Direct matches
+    # Direct matches for egress
     if "egress" in question_lower:
         proc = get_procedure("egress")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
     
+    # LTV Exit Recovery Mode
+    if "exit recovery" in question_lower or "erp" in question_lower or "erm" in question_lower:
+        proc = get_procedure("exit_recovery_mode")
+        if proc:
+            guide = ProcedureGuide(proc)
+            return guide.format_all_steps()
+    
+    # LTV System Diagnosis
+    if "diagnosis" in question_lower or "diagnose" in question_lower:
+        proc = get_procedure("system_diagnosis")
+        if proc:
+            guide = ProcedureGuide(proc)
+            return guide.format_all_steps()
+    
+    # LTV Bus Connector Repair
+    if "bus connector" in question_lower or "connector" in question_lower:
+        proc = get_procedure("bus_connector")
+        if proc:
+            guide = ProcedureGuide(proc)
+            return guide.format_all_steps()
+    
+    # LTV Dust Sensor Replacement
+    if "dust sensor" in question_lower or "sensor replacement" in question_lower:
+        proc = get_procedure("dust_sensor")
+        if proc:
+            guide = ProcedureGuide(proc)
+            return guide.format_all_steps()
+    
+    # LTV Final Verification
+    if "final verification" in question_lower or "verification" in question_lower:
+        proc = get_procedure("verification")
+        if proc:
+            guide = ProcedureGuide(proc)
+            return guide.format_all_steps()
+    
+    # Generic repair help
+    if "repair" in question_lower:
+        return f"""
+Available repair procedures:
+  • Exit Recovery Mode (ERM) - Restore LTV to operational state
+  • System Diagnosis - Identify malfunctions
+  • Bus Connector Repair - Restore power systems
+  • Dust Sensor Replacement - Fix navigation sensors
+  • Final Verification - Confirm successful recovery
+
+Ask for a specific procedure (e.g., "How do I perform system diagnosis?")"""
+    
     # Default fallback
     logger.warning(f"Procedure request not recognized: {question}")
-    return f"I can help with procedures. Available: {', '.join(['UIA Egress'])}"
+    available = ["UIA Egress", "Exit Recovery Mode", "System Diagnosis", "Bus Connector", "Dust Sensor", "Final Verification"]
+    return f"I can help with procedures. Available: {', '.join(available)}"
 
 
 def format_procedure_start(procedure: Procedure) -> str:

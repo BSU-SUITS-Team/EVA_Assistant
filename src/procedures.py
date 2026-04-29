@@ -173,11 +173,169 @@ UIA_EGRESS_PROCEDURES = Procedure(
     ]
 )
 
+# LTV Repair Procedures
+# From NASA SUITS Mission Description Section 2c (LTV Repair)
+
+LTV_ERM_PROCEDURE = Procedure(
+    name="LTV Exit Recovery Mode",
+    description="Exit Recovery Mode (ERM) to restore LTV to operational state",
+    mission_phase="repair",
+    steps=[
+        ProcedureStep(
+            number=1,
+            action="Retrieve ERM procedures from AI assistant (AIA)",
+            target="Voice Assistant",
+        ),
+        ProcedureStep(
+            number=2,
+            action="Follow procedures provided by AIA",
+            target="LTV",
+            notes="Each step will be guided by the AI assistant",
+        ),
+        ProcedureStep(
+            number=3,
+            action="Wait for voice assistant/UI to announce ERM success",
+            target="Voice Assistant / HMD",
+            wait_condition="ERM success confirmation",
+        ),
+        ProcedureStep(
+            number=4,
+            action="Proceed to system diagnosis",
+            target="Voice Assistant",
+        ),
+    ]
+)
+
+LTV_DIAGNOSIS_PROCEDURE = Procedure(
+    name="LTV System Diagnosis",
+    description="Perform system diagnosis to identify LTV malfunctions",
+    mission_phase="repair",
+    steps=[
+        ProcedureStep(
+            number=1,
+            action="Command AIA to conduct system diagnosis",
+            target="Voice Assistant",
+            notes="Say 'Begin system diagnosis' when ready",
+        ),
+        ProcedureStep(
+            number=2,
+            action="Perform visual inspection to determine issues",
+            target="EV",
+            notes="Look for disconnected cables, damaged sensors, power issues",
+        ),
+        ProcedureStep(
+            number=3,
+            action="Wait for diagnosis completion and next steps from AIA",
+            target="Voice Assistant",
+            wait_condition="diagnosis complete",
+        ),
+        ProcedureStep(
+            number=4,
+            action="Receive corrective procedures from AIA",
+            target="Voice Assistant",
+            notes="AIA will provide specific repair procedures based on findings",
+        ),
+    ]
+)
+
+LTV_REPAIR_BUS_CONNECTOR = Procedure(
+    name="LTV Bus Connector Repair",
+    description="Reconnect loose bus connector (power systems restoration)",
+    mission_phase="repair",
+    steps=[
+        ProcedureStep(
+            number=1,
+            action="Locate loose bus connector",
+            target="EV",
+            notes="Check power system connections near main LTV control board",
+        ),
+        ProcedureStep(
+            number=2,
+            action="Verify power systems are limited due to disconnection",
+            target="EV",
+            notes="Confirm reduced functionality before attempting repair",
+        ),
+        ProcedureStep(
+            number=3,
+            action="Reconnect the bus connector securely",
+            target="EV",
+            notes="Ensure full seating and locking tabs engaged",
+        ),
+        ProcedureStep(
+            number=4,
+            action="Wait for AIA to confirm power restoration",
+            target="Voice Assistant",
+            wait_condition="power systems nominal",
+        ),
+    ]
+)
+
+LTV_REPAIR_DUST_SENSOR = Procedure(
+    name="LTV Dust Sensor Replacement",
+    description="Replace damaged dust sensor (optional if time permits)",
+    mission_phase="repair",
+    steps=[
+        ProcedureStep(
+            number=1,
+            action="Locate damaged dust sensor",
+            target="EV",
+            notes="Check navigation sensor array on forward boom",
+        ),
+        ProcedureStep(
+            number=2,
+            action="Remove damaged sensor and install replacement",
+            target="EV",
+            notes="Align connector before insertion; this can be deferred if low on time",
+        ),
+        ProcedureStep(
+            number=3,
+            action="Wait for AIA to verify sensor is operational",
+            target="Voice Assistant",
+            wait_condition="sensor operational and calibrated",
+        ),
+    ]
+)
+
+LTV_VERIFICATION = Procedure(
+    name="LTV Final Verification",
+    description="Conduct final system verification to ensure recovery is successful",
+    mission_phase="repair",
+    steps=[
+        ProcedureStep(
+            number=1,
+            action="Command AIA to conduct final system diagnosis",
+            target="Voice Assistant",
+        ),
+        ProcedureStep(
+            number=2,
+            action="Wait for AIA to verify rover is stable and recovery is successful",
+            target="Voice Assistant",
+            wait_condition="all systems nominal",
+        ),
+    ]
+)
+
 # Procedure database indexed by name
 PROCEDURE_DATABASE: Dict[str, Procedure] = {
     "uia_egress": UIA_EGRESS_PROCEDURES,
     "egress": UIA_EGRESS_PROCEDURES,
     "eva egress": UIA_EGRESS_PROCEDURES,
+    "ltv_erp": LTV_ERM_PROCEDURE,
+    "ltv_exit_recovery_mode": LTV_ERM_PROCEDURE,
+    "exit_recovery_mode": LTV_ERM_PROCEDURE,
+    "erp": LTV_ERM_PROCEDURE,
+    "ltv_diagnosis": LTV_DIAGNOSIS_PROCEDURE,
+    "system_diagnosis": LTV_DIAGNOSIS_PROCEDURE,
+    "diagnosis": LTV_DIAGNOSIS_PROCEDURE,
+    "ltv_repair_bus_connector": LTV_REPAIR_BUS_CONNECTOR,
+    "bus_connector": LTV_REPAIR_BUS_CONNECTOR,
+    "connector_repair": LTV_REPAIR_BUS_CONNECTOR,
+    "ltv_repair_dust_sensor": LTV_REPAIR_DUST_SENSOR,
+    "dust_sensor": LTV_REPAIR_DUST_SENSOR,
+    "sensor_replacement": LTV_REPAIR_DUST_SENSOR,
+    "ltv_verification": LTV_VERIFICATION,
+    "final_verification": LTV_VERIFICATION,
+    "verification": LTV_VERIFICATION,
 }
 
 
@@ -198,6 +356,8 @@ def is_procedure_request(question: str) -> bool:
     procedure_keywords = {
         "procedure", "procedures", "steps", "step", "guide", "guidance",
         "checklist", "check list", "egress", "ingress", "repair", "how to",
-        "walk through", "walkthrough", "instruction", "instructions"
+        "walk through", "walkthrough", "instruction", "instructions",
+        "exit recovery", "erm", "erp", "diagnosis", "diagnose", "bus connector",
+        "dust sensor", "sensor replacement", "verification", "verify"
     }
     return any(keyword in normalized for keyword in procedure_keywords)

@@ -12,6 +12,7 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
+from thresholds import THRESHOLDS, UNITS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -157,3 +158,72 @@ def format_telemetry_for_llm(data: Dict[str, Any]) -> str:
             lines.append(f"\n[{section.upper()}]: {content}")
 
     return "\n".join(lines)
+
+
+def _flatten_snapshot(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten a nested telemetry snapshot into simple key -> value map.
+
+    Uses dotted keys for nested objects (e.g., 'EVA.json.eva1.primary_battery_level').
+    """
+    flat = {}
+    for section, content in (snapshot or {}).items():
+        prefix = section.replace('.json', '')
+        if isinstance(content, dict):
+            for k, v in content.items():
+                if isinstance(v, dict):
+                    for subk, subv in v.items():
+                        flat_key = f"{prefix}.{k}.{subk}"
+                        flat[flat_key] = subv
+                else:
+                    flat_key = f"{prefix}.{k}"
+                    flat[flat_key] = v
+        else:
+            flat[prefix] = content
+    return flat
+
+
+def check_telemetry_thresholds(snapshot: Dict[str, Any]) -> Dict[str, list]:
+    """Check snapshot against `THRESHOLDS` and return violations.
+
+    Returns a dict with keys: 'below_min', 'above_max', each a list of messages.
+    """
+    below = []
+    above = []
+
+    flat = _flatten_snapshot(snapshot)
+
+    # For each known threshold field, search for matching keys in the flattened
+    # snapshot. Matching is simple containment: field name in flattened key.
+    for field, (min_v, max_v) in THRESHOLDS.items():
+        for k, v in flat.items():
+            try:
+                if field in k and isinstance(v, (int, float)):
+                    if min_v is not None and v < min_v:
+                        below.append(f"{k}={v} {UNITS.get(field,'') or ''} < min {min_v}")
+                    if max_v is not None and v > max_v:
+                        above.append(f"{k}={v} {UNITS.get(field,'') or ''} > max {max_v}")
+            except Exception:
+                # Defensive: ignore non-comparable values
+                continue
+
+    return {"below_min": below, "above_max": above}
+
+
+def verify_units_present(snapshot: Dict[str, Any]) -> list:
+    """Return a list of flattened keys that don't have a known unit mapping."""
+    missing = []
+    flat = _flatten_snapshot(snapshot)
+    for k in flat.keys():
+        # strip prefixes and look for a matching unit key
+        # e.g., 'EVA.eva1.primary_battery_level' -> 'primary_battery_level'
+        parts = k.split('.')
+        # take last two parts if last part looks like a field name
+        candidates = [parts[-1]] + (parts[-2:] if len(parts) >= 2 else [])
+        found = False
+        for c in candidates:
+            if c in UNITS:
+                found = True
+                break
+        if not found:
+            missing.append(k)
+    return missing
