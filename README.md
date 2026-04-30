@@ -152,17 +152,10 @@ For more options, see [DATA_SYNC.md](DATA_SYNC.md).
    - Output: Deterministic code path for value lookup, depletion estimates, and arithmetic
 
 4. **Procedure Database** ([procedures.py](src/procedures.py))
-   - Hardcoded, mission-critical procedure sequences
-   - Contains verified step-by-step procedures for EVA tasks
-   - **Implemented procedures:**
-     - UIA Egress (26 steps) – EVA preparation with O2 tank prep
-     - LTV Exit Recovery Mode (4 steps) – Restore operational state
-     - LTV System Diagnosis (4 steps) – Identify malfunctions
-     - LTV Bus Connector Repair (4 steps) – Restore power systems
-     - LTV Dust Sensor Replacement (3 steps) – Fix navigation sensors
-     - LTV Final Verification (2 steps) – Confirm successful recovery
-   - Source: NASA SUITS Mission Description Appendix A
-   - Never LLM-generated for safety
+  - UIA egress stays local and mission-verified.
+  - LTV procedures are loaded at runtime from TSS `LTV_ERRORS.json`.
+  - The runtime loader parses error codes, descriptions, and step text into deterministic procedure objects.
+  - Never LLM-generated for safety.
 
 5. **Procedure Guidance Handler** ([procedure_handler.py](src/procedure_handler.py))
    - Detects procedure requests in natural language questions

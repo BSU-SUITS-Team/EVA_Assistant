@@ -18,8 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
-TELEMETRY_SERVER_BASE = os.getenv("TELEMETRY_SERVER_BASE", "http://172.18.0.1:14141")
-TELEMETRY_FILES = ["EVA.json", "ROVER.json", "LTV.json"]
+TELEMETRY_SERVER_BASE = os.getenv("TELEMETRY_SERVER_BASE", "http://172.17.0.1:14141")
+TELEMETRY_FILES = ["EVA.json", "ROVER.json", "LTV.json", "LTV_ERRORS.json"]
 POLL_INTERVAL_SECONDS = 1  # Fetch every second like frontend
 
 # Global state

@@ -196,6 +196,20 @@ Available repair procedures:
 Ask for a specific procedure (e.g., "How do I perform system diagnosis?")
 ```
 
+### Active Error Summary
+
+**Question:** What errors do I have?
+```
+Assistant: Active errors (5):
+- 1969: Backup Fuse Error
+- 2235: Dust Sensor Error
+- 3452: Poor Comms RSSI
+- 4280: Small Fuse Box Error
+- 4509: NAV Restart & Manual Return to Home
+
+Ask for a specific code, for example: "What is 4800?" or "Tell me about error 4509."
+```
+
 ---
 
 ## Complex Query Patterns

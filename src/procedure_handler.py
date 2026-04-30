@@ -4,10 +4,11 @@ Provides human-readable guidance with confirmation flow.
 """
 
 import logging
+import re
 from typing import Optional, Tuple
 
-from procedures import Procedure, is_procedure_request, get_procedure as get_local_procedure
-from procedure_store import get_procedure as get_remote_procedure
+from procedures import Procedure, is_procedure_request, get_procedure, list_available_procedures
+from procedure_store import get_error_metadata, list_active_errors
 
 logger = logging.getLogger(__name__)
 
@@ -91,50 +92,103 @@ def handle_procedure_request(question: str) -> Optional[str]:
     Process a procedure request and return formatted guidance.
     Returns None if not a procedure request or procedure not found.
     """
-    if not is_procedure_request(question):
-        return None
-
     # Try to extract procedure name from question
     question_lower = question.lower()
 
-    # Direct matches for egress (prefer remote authoritative TSS if configured)
+    # Direct 4-digit LTV error code lookup from TSS payload.
+    # Handle code-only or malformed prompts before any keyword gating.
+    code_match = re.search(r"\b(\d{4})\b", question_lower)
+    if code_match:
+        error_id = code_match.group(1)
+        metadata = get_error_metadata(error_id)
+        proc = get_procedure(error_id)
+        if proc:
+            guide = ProcedureGuide(proc)
+            heading = f"Error {metadata.get('code', error_id)}" if metadata else f"Error {error_id}"
+            description = metadata.get("description", proc.name) if metadata else proc.name
+            status = "ACTIVE" if metadata and metadata.get("needs_resolved") else "REPORTED"
+            return f"{heading} - {description}\nStatus: {status}\n\n{guide.format_all_steps()}"
+
+        active_errors = list_active_errors()
+        available_codes = []
+        for entry in active_errors:
+            available_codes.append(str(entry.get("code", "unknown")))
+
+        if active_errors:
+            return (
+                f"Error {error_id} is not present in the current runtime LTV_ERRORS.json.\n"
+                f"Active error codes: {', '.join(available_codes)}\n\n"
+                f"Ask about one of the active codes, or ask 'What errors do I have?'"
+            )
+
+        return f"Error {error_id} is not present in the current runtime LTV_ERRORS.json."
+
+    if not is_procedure_request(question):
+        return None
+
+    # Active error summary questions should return the unresolved error list.
+    if any(phrase in question_lower for phrase in (
+        "what errors do i have",
+        "do i have any active errors",
+        "active errors",
+        "active error codes",
+        "what are my active error codes",
+        "what are my active errors",
+        "current error codes",
+        "which errors",
+        "what errors are active",
+    )):
+        active_errors = list_active_errors()
+        if not active_errors:
+            return "No active errors are currently reported in LTV_ERROS.json."
+
+        lines = [f"Active errors ({len(active_errors)}):"]
+        for entry in active_errors:
+            code = entry.get("code", "unknown")
+            description = entry.get("description", "")
+            lines.append(f"- {code}: {description}")
+        lines.append("")
+        lines.append("Ask for a specific code, for example: 'What is 4800?' or 'Tell me about error 4509.'")
+        return "\n".join(lines)
+
+    # Direct matches for egress (UIA remains local; LTV resolves at runtime)
     if "egress" in question_lower:
-        proc = get_remote_procedure("egress", requester="assistant", fallback=get_local_procedure("egress"))
+        proc = get_procedure("egress")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
 
     # LTV Exit Recovery Mode
     if "exit recovery" in question_lower or "erp" in question_lower or "erm" in question_lower:
-        proc = get_remote_procedure("exit_recovery_mode", requester="assistant", fallback=get_local_procedure("exit_recovery_mode"))
+        proc = get_procedure("exit_recovery_mode")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
 
     # LTV System Diagnosis
     if "diagnosis" in question_lower or "diagnose" in question_lower:
-        proc = get_remote_procedure("system_diagnosis", requester="assistant", fallback=get_local_procedure("system_diagnosis"))
+        proc = get_procedure("system_diagnosis")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
 
     # LTV Bus Connector Repair
     if "bus connector" in question_lower or "connector" in question_lower:
-        proc = get_remote_procedure("bus_connector", requester="assistant", fallback=get_local_procedure("bus_connector"))
+        proc = get_procedure("bus_connector")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
 
     # LTV Dust Sensor Replacement
     if "dust sensor" in question_lower or "sensor replacement" in question_lower:
-        proc = get_remote_procedure("dust_sensor", requester="assistant", fallback=get_local_procedure("dust_sensor"))
+        proc = get_procedure("dust_sensor")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
 
     # LTV Final Verification
     if "final verification" in question_lower or "verification" in question_lower:
-        proc = get_remote_procedure("verification", requester="assistant", fallback=get_local_procedure("verification"))
+        proc = get_procedure("verification")
         if proc:
             guide = ProcedureGuide(proc)
             return guide.format_all_steps()
@@ -153,7 +207,7 @@ Ask for a specific procedure (e.g., "How do I perform system diagnosis?")"""
     
     # Default fallback
     logger.warning(f"Procedure request not recognized: {question}")
-    available = ["UIA Egress", "Exit Recovery Mode", "System Diagnosis", "Bus Connector", "Dust Sensor", "Final Verification"]
+    available = list_available_procedures()
     return f"I can help with procedures. Available: {', '.join(available)}"
 
 
