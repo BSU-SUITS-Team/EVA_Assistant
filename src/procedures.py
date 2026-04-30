@@ -119,3 +119,69 @@ def is_procedure_request(question: str) -> bool:
         "error", "errors", "error code", "code", "codes", "troubleshoot", "troubleshooting",
     }
     return any(keyword in normalized for keyword in procedure_keywords)
+
+
+# Error Code to Procedure mapping for automated recommendations
+ERROR_PROCEDURE_MAP: Dict[str, Dict[str, str]] = {
+    # Format: "error_code": {"description": "...", "action": "..."}
+    "0000": {
+        "description": "Recovery Mode",
+        "action": "Exit Recovery Mode (ERM)",
+        "severity": "critical",
+    },
+    "2129": {
+        "description": "Backup Fuse Error",
+        "action": "Replace fuses or diagnose power system",
+        "severity": "critical",
+    },
+    "4155": {
+        "description": "Main Power Bus Error",
+        "action": "Reconnect loose bus connector or replace power cable",
+        "severity": "critical",
+    },
+    "4761": {
+        "description": "Dust Sensor Error",
+        "action": "Replace dust sensor or perform diagnostics",
+        "severity": "high",
+    },
+    "2235": {
+        "description": "Dust Sensor Error",
+        "action": "Replace dust sensor",
+        "severity": "medium",
+    },
+    "3452": {
+        "description": "Poor Comms RSSI",
+        "action": "Adjust antenna or restart comms system",
+        "severity": "medium",
+    },
+    "4280": {
+        "description": "Small Fuse Box Error",
+        "action": "Check scientific fuses and replace as needed",
+        "severity": "medium",
+    },
+    "4509": {
+        "description": "NAV Restart & Manual Return to Home",
+        "action": "Restart navigation system and manual return to base",
+        "severity": "high",
+    },
+    "4800": {
+        "description": "Exit Recovery Mode (ERM)",
+        "action": "Perform Exit Recovery Mode procedure",
+        "severity": "critical",
+    },
+    "4968": {
+        "description": "Subsystem Power Bus Error",
+        "action": "Inspect and reconnect power cables",
+        "severity": "high",
+    },
+    "2441": {
+        "description": "Comms Reboot Required Error",
+        "action": "Restart communications subsystem",
+        "severity": "medium",
+    },
+}
+
+
+def get_error_procedure(error_code: str) -> Optional[Dict[str, str]]:
+    """Get procedure recommendation for an error code."""
+    return ERROR_PROCEDURE_MAP.get(error_code)

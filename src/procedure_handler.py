@@ -1,13 +1,14 @@
 """
 Procedure guidance handler: manages step-by-step procedure walkthroughs.
 Provides human-readable guidance with confirmation flow.
+Integrates error-to-procedure mapping and recommendations.
 """
 
 import logging
 import re
 from typing import Optional, Tuple
 
-from procedures import Procedure, is_procedure_request, get_procedure, list_available_procedures
+from procedures import Procedure, is_procedure_request, get_procedure, list_available_procedures, get_error_procedure
 from procedure_store import get_error_metadata, list_active_errors
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,17 @@ def handle_procedure_request(question: str) -> Optional[str]:
             heading = f"Error {metadata.get('code', error_id)}" if metadata else f"Error {error_id}"
             description = metadata.get("description", proc.name) if metadata else proc.name
             status = "ACTIVE" if metadata and metadata.get("needs_resolved") else "REPORTED"
-            return f"{heading} - {description}\nStatus: {status}\n\n{guide.format_all_steps()}"
+            
+            # Add error-to-procedure recommendation if available
+            error_rec = get_error_procedure(error_id)
+            recommendation = ""
+            if error_rec:
+                recommendation = f"\n🔧 Recommended Action: {error_rec.get('action', 'Perform procedure')}"
+                severity = error_rec.get('severity', 'medium')
+                if severity == "critical":
+                    recommendation = f"\n🚨 CRITICAL: {error_rec.get('action', 'Perform procedure immediately')}"
+            
+            return f"{heading} - {description}\nStatus: {status}{recommendation}\n\n{guide.format_all_steps()}"
 
         active_errors = list_active_errors()
         available_codes = []
